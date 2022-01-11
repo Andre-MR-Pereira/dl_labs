@@ -6,6 +6,8 @@ import argparse
 import random
 import os
 
+import random
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -83,20 +85,27 @@ class MLP(object):
     # linear models with no changes to the training loop or evaluation code
     # in main().
     def __init__(self, n_classes, n_features, hidden_size, layers):
+        
         # Initialize an MLP with a single hidden layer.
         units = [n_features, hidden_size, n_classes]
         mu, sigma = 0.1, 0.1
+        
+        n_size = 1
+       
+        self.W1 = np.random.normal(mu, sigma, size=(units[1], units[0]))
+        self.b1 = np.zeros((units[1],n_size))
+        self.W2 = np.random.normal(mu, sigma, size=(units[2], units[1]))
+        self.b2 = np.zeros((units[2],n_size))
         
         print("NN shape:\n ===============================")
         print(n_features," L0 : features")
         print(hidden_size," L1 : hidden units")
         print(n_classes," L2 : classes")
+        print(self.W1.shape," W1 shape")
+        print(self.b1.shape," b1 shape")
+        print(self.W2.shape," W2 shape")
+        print(self.b2.shape," b2 shape")
         print(" ===============================")
-        
-        self.W1 = np.random.normal(mu, sigma, size=(units[1], units[0]))
-        self.b1 = np.zeros(units[1])
-        self.W2 = np.random.normal(mu, sigma, size=(units[2], units[1]))
-        self.b2 = np.zeros(units[2])
         
 
     def predict(self, X):
@@ -106,16 +115,26 @@ class MLP(object):
         
         #FORWARD PROPAGATION
         y_hat=[]
+        #print(np.shape(self.W1))
+        #print(self.W1[0:5],"self.W1 no predict")
+        teste=True
+        
         for x in X:
-            z1 = self.W1.dot(x) + self.b1
+            z1 = self.W1.dot(x[:, None]) + self.b1
             h1 = np.maximum(z1 , 0)
 
             z2 = self.W2.dot(h1) + self.b2
-            
-            z2 -= z2.max()
-            probs = np.exp(z2) / np.sum(np.exp(z2))
 
-            y_hat.append(np.argmax(probs))
+            y_hat.append(np.argmax(z2))
+            
+        if teste==True:
+            print("Predict shape:\n ###########################")
+            print(x[:, None].shape," x shape")
+            print(z1.shape," z1 shape")
+            print(h1.shape," h1 shape")
+            print(z2.shape," z2 shape")
+            print(" ###########################")
+            
         
         return y_hat
 
@@ -126,73 +145,87 @@ class MLP(object):
         """
         # Identical to LinearModel.evaluate()
         y_hat = self.predict(X)
-        print(np.shape(y_hat))
-        print(y_hat[0:7],"y_hat predicted")
-        print(np.shape(y))
-        print(y[0:7],"y true")
         n_correct = (y == y_hat).sum()
         n_possible = y.shape[0]
-        print(n_correct / n_possible,"Ratio")
+        print("Evaluate shape:\n TTTTTTTTTTTTTTTTTTTTTTTTTT")
+        print(n_correct," n_correct")
+        print(n_possible," n_possible")
+        print(n_correct / n_possible," Ratio")
+        
+        print("Results:")
+        print(y_hat[0:7],"y_hat predicted")
+        print(y[0:7],"y true")
+        print(" TTTTTTTTTTTTTTTTTTTTTTTTTT")
         return n_correct / n_possible
 
     def train_epoch(self, X, y, learning_rate=0.001):
         
-        #FORWARD PROPAGATION
-        #print(np.shape(X),"X")
-        #print(np.shape(self.W1),"W1")
-        #print(np.shape(self.b1),"b1")
-        #print(np.shape(self.W2),"W2")
-        #print(np.shape(self.b2),"b2")
-        #print(np.shape(y))
-        #print(y[0:5],"y true")
+        n_classes = 10
+        one_hot = np.zeros((np.size(y, 0), n_classes))
+        for i in range(np.size(y, 0)):
+            one_hot[i, y[i]] = 1
+        y = one_hot
         
-        grad_W1_save = []
-        grad_b1_save = []
-        grad_W2_save = []
-        grad_b2_save = []
+        teste=True
         
         for x_step,y_step in zip(X,y):
-            z1 = self.W1.dot(x_step) + self.b1
+            z1 = self.W1.dot(x_step[:, None]) + self.b1
             h1 = np.maximum(z1 , 0)
-            #print(h1,"Teste")
 
             z2 = self.W2.dot(h1) + self.b2
-
+            
+            #if teste==True:
+                #print(z2,"z2",z2.max())            
             z2 -= z2.max()
+            #if teste==True:
+                #teste=False
+                #print(z2,"z2")
+            
             probs = np.exp(z2) / np.sum(np.exp(z2))
             
             #BACKWARD PROPAGATION: so atualizar os weights no fim da back prop TODA!
-
-            grad_z2 = probs - y_step
-            grad_W2 = grad_z2[:, None].dot(h1[:, None].T)
+            #print(probs,"probs")
+            #print(y_step,"y_step")
+            grad_z2 = probs - y_step[:, None]
+            #print(grad_z2,"grad_z")
+            grad_W2 = grad_z2.dot(h1.T)
             grad_b2 = grad_z2
             grad_h1 = self.W2.T.dot(grad_z2)
             
-            #print((grad_h1 > 0) * 1,"Teste")
             
-            grad_z1 = grad_h1 * ((grad_h1 > 0) * 1)
-            grad_W1 = np.dot(grad_z1[:, None],x_step[:, None].T)
+            grad_z1 = grad_h1 * ((h1 > 0) * 1)
+            grad_W1 = np.dot(grad_z1,x_step[:, None].T)
             grad_b1 = grad_z1
-            
-            grad_W1_save.append(grad_W1)
-            grad_b1_save.append(grad_b1)
-            grad_W2_save.append(grad_W2)
-            grad_b2_save.append(grad_b2)
 
-        #WEIGHTS UPDATE
-        for i in range(np.shape(X)[0]):
-            self.W1 -= learning_rate*grad_W1_save[i]
-            self.b1 -= learning_rate*grad_b1_save[i]
-            self.W2 -= learning_rate*grad_W2_save[i]
-            self.b2 -= learning_rate*grad_b2_save[i]
-            
-        #print(np.shape(grad_W1))
-        #print(grad_W1[0:5],"grad_W1")
-        #print(np.shape(self.W1))
-        #print(self.W1[0:5],"self.W1")
-        #print(np.shape(self.b1))
-        #print(self.b1[0:5],"self.b1")
-        
+            if teste == True:
+                teste=False
+                print("Evaluate shape:\n $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+                print(X.shape," X shape")
+                print(y.shape," y shape")
+                print(x_step[:, None].shape," x_step shape")
+                print(y_step[:, None].shape," y shape")
+                print(z1.shape," z1 shape")
+                print(h1.shape," h1 shape")
+                print(z2.shape," z2 shape")
+                print(probs.shape," probs shape")
+                print(grad_z2.shape," grad_z2 shape")
+                print(grad_W2.shape," grad_W2 shape")
+                print(grad_b2.shape," grad_b2 shape")
+                print(grad_h1.shape," grad_h1 shape")
+                print(grad_z1.shape," grad_z1 shape")
+                print(grad_W1.shape," grad_W1 shape")
+                print(grad_b1.shape," grad_b1 shape")
+                print(self.W1.shape," self.W1 shape")
+                print(self.b1.shape," self.b1 shape")
+                print(self.W2.shape," self.W2 shape")
+                print(self.b2.shape," self.b2 shape")
+                print(" $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+                
+            #WEIGHTS UPDATE
+            self.W1 -= learning_rate*grad_W1
+            self.b1 -= learning_rate*grad_b1
+            self.W2 -= learning_rate*grad_W2
+            self.b2 -= learning_rate*grad_b2
 
 def plot(epochs, valid_accs, test_accs):
     plt.xlabel('Epoch')
@@ -241,10 +274,7 @@ def main():
         model = LogisticRegression(n_classes, n_feats)
     else:
         model = MLP(n_classes, n_feats, opt.hidden_size, opt.layers)
-        one_hot = np.zeros((np.size(train_y, 0), n_classes))
-        for i in range(np.size(train_y, 0)):
-            one_hot[i, train_y[i]] = 1
-        train_y = one_hot
+        
     epochs = np.arange(1, opt.epochs + 1)
     valid_accs = []
     test_accs = []
